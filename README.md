@@ -1,345 +1,296 @@
-# HeroLens System: Complete Architecture Blueprint
+# HeroLens — Trust, On the Record
 
-## Executive Summary
+<div align="center">
 
-**TL;DR:** HeroLens implements a hybrid streaming architecture using RTMP as the default with fallback to next-generation protocols (RoQ, MoQ, SRT) based on network conditions. The system operates fully offline except for streaming, uses seed phrase recovery, and incorporates immutable ledgers for data integrity.
+**Twitch-style civic livestreams + immutable proof.**
+Footage can’t vanish. Real heroes get funded.
 
-## Core Architecture Overview
+[![Status](https://img.shields.io/badge/status-alpha-%23b48ead)](#)
+[![Zero-Harm](https://img.shields.io/badge/zero--harm-enabled-%234a9c7c)](#)
+[![Consent-First](https://img.shields.io/badge/consent-first-%23a3be8c)](#)
+[![OTS Anchored](https://img.shields.io/badge/ots-anchored-%235e81ac)](#)
+[![IPFS/Arweave](https://img.shields.io/badge/storage-IPFS%20%2B%20Arweave-%23888)](#)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-%230071c1)](#license)
 
-### System Philosophy
-- **Offline-First Design**: Everything functions without internet except streaming module
-- **Cryptographic Foundation**: Private key-based account system with seed phrase recovery
-- **Immutable Integrity**: Built-in ledger system ensures data consistency
-- **Future-Proof Streaming**: Multi-protocol approach adapting to network conditions
+</div>
 
-## 1. Streaming Module Layer Design
+> \[!IMPORTANT]
+> **Purpose.** Restore trust in public institutions by recording frontline service work as **consent-first, redacted, immutable** streams. Evidence is auto-hashed, anchored, and auditable. Micro-funding rewards verified acts of service.
 
-### Primary Protocol Stack
+---
 
-#### **Tier 1: RTMP (Default/Fallback)**
-- **Use Case**: Universal compatibility, mature toolchain support
-- **Advantages**: Lightweight transmission optimized for speed and low latency
-- **Implementation**: Adobe's RTMP with AES-128 encryption
-- **Latency**: 2-5 seconds typical
+## ✨ What makes HeroLens different?
 
-#### **Tier 2: RTP over QUIC (RoQ) - Primary Next-Gen**
-- **Research Backing**: Improvements of approximately 30% in latency and 60% in connection startup expected in QUIC-based protocols compared to WebRTC
-- **Performance**: RoQ performs best, achieving latency as low as ~122 ms on 5G and ~168 ms on Wi-Fi for the 480p/5Mbps configuration
-- **Advantages**: Combines the low-latency and multiplexing benefits of QUIC with the real-time capabilities of RTP
-- **Implementation Status**: Early adoption phase, GStreamer support available
+* **“Proof, not promises.”** Chain-of-custody from camera → hash → IPFS/Arweave → OpenTimestamps.
+* **Consent-by-design.** Face-blur and PII redaction default **ON**; emergency blackout hotkey <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>.
+* **Zero-Harm guardrails.** Context-sensitive delays, witness protection modes, and review queues.
+* **Civic funding rails.** Tips + gov micro-grants routed to verified **Hero Wallets**.
 
-#### **Tier 3: Media over QUIC (MoQ) - Experimental**
-- **Research Application**: Provides a simple, low-latency solution for media ingestion and distribution, facilitates publisher/subscriber communication
-- **Trade-offs**: MoQ shows the highest latency (432-560 ms) due to the relay architecture
-- **Future Potential**: Media Over QUIC aspires to streamline the entire streaming process by bringing both contribution and distribution into a single protocol
+> \[!NOTE]
+> HeroLens is **offline-first**. If the network drops, the encrypted recording continues; anchors publish when connectivity returns.
 
-#### **Tier 4: SRT (Secure Reliable Transport) - Professional Grade**
-- **Use Case**: Superior quality and reliability compared to other protocols like RTMP, quickly becoming the industry standard for professional media organizations
-- **Advantages**: Low latency and reliable performance, making it ideal for live events and real-time streaming
-- **Security**: Built-in encryption and error recovery mechanisms
+---
 
-#### **Tier 5: Lightweight ICN/NDN Integration - Research Edge**
-- **Future-Proofing**: NDN provides advantages including edge device caching to reduce distance to IoT devices, multiple IoT devices can perform request aggregation
-- **Bandwidth Efficiency**: Information Centric Networking moves computation, bandwidth, and storage resources closer to the end user to reduce backbone network traffic
-- **Edge Computing Synergy**: ICN and Edge Computing have common functionalities such as caching, the two technologies may need to be co-located
+## 🧭 Quickstart (dev preview)
 
-### Adaptive Protocol Selection Algorithm
+```bash
+# 1) Clone
+git clone https://github.com/<you>/herolens && cd herolens
 
-```javascript
-// Protocol Selection Logic
-class ProtocolSelector {
-  selectOptimalProtocol(networkConditions, requirements) {
-    const { latency, bandwidth, stability, edgeSupport } = networkConditions;
-    const { criticalLatency, securityLevel, compatibility } = requirements;
-    
-    // Ultra-low latency requirements (< 150ms)
-    if (criticalLatency < 150 && edgeSupport && bandwidth > 10) {
-      return this.attemptQuicProtocols(['RoQ', 'MoQ']);
-    }
-    
-    // Professional/broadcast grade
-    if (securityLevel === 'high' && stability > 0.95) {
-      return 'SRT';
-    }
-    
-    // Universal compatibility fallback
-    return 'RTMP';
-  }
-  
-  attemptQuicProtocols(protocols) {
-    // Try next-gen protocols with graceful degradation
-    for (const protocol of protocols) {
-      if (this.isSupported(protocol)) return protocol;
-    }
-    return 'RTMP'; // Fallback
-  }
+# 2) Configure (consent & storage)
+cp config/example.herolens.yaml config/herolens.yaml
+
+# 3) Run (local dev)
+python -m src.herolens --config config/herolens.yaml
+```
+
+<details>
+<summary><b>🔐 Minimal <code>config/herolens.yaml</code></b> (click to view)</summary>
+
+```yaml
+app:
+  node_id: "fm-ab-node01"
+  mode: "consent-first"   # consent-first | training | ombuds
+recording:
+  face_blur: "on"         # on by default
+  license_plate_blur: "on"
+  audio_denoise: "on"
+  pre_buffer_sec: 10
+  blackout_hotkey: "ctrl+shift+b"  # local screen goes black; recording continues
+immutability:
+  ipfs: true
+  arweave: true
+  ots: true
+  publish_delay_sec: 90    # grace window for safety review
+privacy:
+  geo_fuzz_km: 3.0
+  pii_scrub: ["names","addresses","plates"]
+funding:
+  enable_hero_wallets: true
+  allowed_rails: ["gov_microgrant","tips"]
+```
+
+</details>
+
+---
+
+## 🧩 System Overview
+
+```mermaid
+flowchart LR
+    A[Camera + Local Cache] --> B[Redaction Engine\n(face/plate blur, PII scrub)]
+    B --> C[Hash + Chunker\n(SHA-256, Merkle map)]
+    C --> D[Local Chain-of-Custody Log]
+    D --> E[IPFS Pin]
+    D --> F[Arweave Bundle]
+    D --> G[OpenTimestamps Anchor]
+    E --> H[Public Evidence Index]
+    F --> H
+    G --> H
+```
+
+> \[!WARNING]
+> **No doxxing.** Public evidence cards use fuzzy geo (±3 km), time windows, and redacted thumbnails. Raw originals stay encrypted under legal custody rules.
+
+---
+
+## 🧪 Chain-of-Custody (sequence)
+
+```mermaid
+sequenceDiagram
+    participant St as Streamer Device
+    participant Ver as Verifier (Ombuds / IA)
+    participant Net as IPFS/Arweave/OTS
+    participant Pub as Public Evidence Index
+
+    St->>St: Record + redact + hash
+    St->>Ver: Submit encrypted package + manifest
+    Ver->>Net: Pin to IPFS + Arweave, request OTS proof
+    Net-->>Ver: CIDs + TXIDs + OTS receipt
+    Ver->>Pub: Publish evidence card (redacted)
+```
+
+---
+
+## 📂 Repo Structure (UI-styled)
+
+```text
+herolens/
+├─ README.md
+├─ LICENSE
+├─ .github/
+│  ├─ ISSUE_TEMPLATE.md
+│  └─ workflows/
+│     ├─ ci.yml
+│     └─ notarize.yml                # anchors hashes to IPFS/Arweave + OTS
+├─ src/
+│  ├─ herolens/                      # core
+│  │  ├─ capture.py
+│  │  ├─ redact.py                   # face/plate blur, audio PII scrub
+│  │  ├─ hash_chain.py               # Merkle mapping + receipts
+│  │  ├─ anchors.py                  # IPFS/Arweave/OTS clients
+│  │  └─ wallet.py                   # Hero Wallet payouts & attestations
+│  └─ ui/
+│     └─ dashboard.py                # local evidence cards + review queue
+├─ docs/
+│  ├─ safety/zero_harm.md
+│  ├─ policy/consent_model.md
+│  ├─ legal/chain_of_custody.md
+│  └─ schemas/evidence.schema.json
+├─ web/
+│  └─ index.html                     # static “Public Evidence Index”
+├─ datasets/
+│  ├─ evidence/                      # redacted cards (public)
+│  └─ custody/                       # encrypted originals (restricted)
+├─ config/
+│  └─ example.herolens.yaml
+└─ scripts/
+   ├─ export_evidence_card.py
+   └─ verify_anchor.py
+```
+
+> **PROMPT (docs/safety/zero\_harm.md):** Describe threat models, mitigations, and emergency switching logic (e.g., delayed publish in volatile contexts).
+
+---
+
+## 🛡️ Safety Modes
+
+* **👁️ Redaction First:** Face/plate blur, name scrub in subtitles, watermarking.
+* **🕳️ Blackout Mode:** <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> hides screen but keeps recording with time-salted hashes.
+* **⏱️ Safe Delay:** Configurable publish delay for ombuds review.
+* **🎭 Witness Shield:** Mask voices and swap to silhouette thumbnail.
+
+> \[!TIP]
+> Keep a **laminated consent card** in frame at start of service interactions. The UI stores a still frame of consent terms + timestamp + signer ID (when appropriate and safe).
+
+---
+
+## 🧾 Evidence Card (public JSON)
+
+```json
+{
+  "$schema": "./docs/schemas/evidence.schema.json",
+  "event_id": "HL-2025-08-23-fm-ab-014",
+  "node_id": "fm-ab-node01",
+  "time_window": "2025-08-23T15:11Z→15:37Z",
+  "geo_fuzz_km": 3.0,
+  "media": {
+    "preview": "datasets/evidence/HL-...-thumb.jpg",
+    "segments": ["ipfs://CID1", "ipfs://CID2"]
+  },
+  "anchors": {
+    "ipfs_root": "Qm...CID",
+    "arweave_tx": "ArTxID...",
+    "ots_receipt": "base64:..."
+  },
+  "redaction": ["faces","plates","names"],
+  "consent": "on-record",
+  "funding_link": "hero://wallet/fm-ab-node01",
+  "notes": "Public-interest disclosure; PII removed."
 }
 ```
 
-## 2. Offline-First Architecture Optimization
+---
 
-### Core Components
+## 💸 Hero Funding (transparent rails)
 
-#### **Local Database System**
-```javascript
-// Seed-based Database Recovery
-class HeroLensDB {
-  constructor(seedPhrase) {
-    this.privateKey = this.derivePrivateKey(seedPhrase);
-    this.publicKey = this.derivePublicKey(this.privateKey);
-    this.storage = new ImmutableStorage(this.privateKey);
-  }
-  
-  // Cryptographic key derivation from seed
-  derivePrivateKey(seedPhrase) {
-    return crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt: "HeroLens", iterations: 100000 },
-      seedPhrase,
-      { name: "AES-GCM", length: 256 }
-    );
-  }
-}
+| Rail             | Who funds    | Release rule          | Audit signal    |
+| ---------------- | ------------ | --------------------- | --------------- |
+| Tips             | Public       | T+0 on verified event | CID + TXID      |
+| Gov micro-grants | Agency       | Milestone-gated       | Batch ledger    |
+| Civic pool       | Philanthropy | Quadratic             | Periodic report |
+
+> \[!TIP]
+> **Attestations.** Community validators (school, faith group, union) co-sign events to increase payout weight.
+
+---
+
+## 🧱 CI: Notarization Workflow (GitHub Actions)
+
+```yaml
+name: notarize
+on:
+  push:
+    paths: ["datasets/evidence/**.json", "datasets/evidence/**.jpg"]
+jobs:
+  anchor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute hashes
+        run: python scripts/verify_anchor.py --scan datasets/evidence
+      - name: Pin to IPFS
+        run: python -m src.herolens.anchors --ipfs pin --dir datasets/evidence
+      - name: Arweave bundle
+        run: python -m src.herolens.anchors --arweave bundle datasets/evidence
+      - name: OpenTimestamps
+        run: python -m src.herolens.anchors --ots stamp evidence.hashes
 ```
 
-#### **Immutable Ledger Integration**
-```javascript
-// Lightweight blockchain for data integrity
-class MicroLedger {
-  constructor(privateKey) {
-    this.chain = [];
-    this.privateKey = privateKey;
-  }
-  
-  addBlock(data, previousHash) {
-    const block = {
-      timestamp: Date.now(),
-      data: data,
-      previousHash: previousHash,
-      hash: this.calculateHash(data, previousHash),
-      signature: this.sign(data)
-    };
-    
-    this.chain.push(block);
-    return block.hash;
-  }
-  
-  verifyIntegrity() {
-    // Verify entire chain integrity
-    for (let i = 1; i < this.chain.length; i++) {
-      if (!this.verifyBlock(this.chain[i], this.chain[i-1])) {
-        return false;
-      }
-    }
-    return true;
-  }
-}
-```
+---
 
-#### **Resource Management System**
-```javascript
-// Minimal footprint resource allocator
-class ResourceManager {
-  constructor() {
-    this.maxMemoryUsage = 50 * 1024 * 1024; // 50MB limit
-    this.compressionLevel = 9; // Maximum compression
-    this.cacheStrategy = 'LRU';
-  }
-  
-  optimizeForMinimalFootprint() {
-    // Aggressive optimization techniques
-    this.enableTreeShaking();
-    this.implementLazyLoading();
-    this.compressStaticAssets();
-    this.minimizeDependencies();
-  }
-}
-```
+## 📊 Roadmap (living)
 
-## 3. Research-Backed Improvements & Future-Proofing
+* M0 ▰▰▰▱▱ **Local capture + redaction**
+* M1 ▰▰▱▱▱ **Anchors + receipts**
+* M2 ▰▱▱▱▱ **Public evidence index (read-only)**
+* M3 ▱▱▱▱▱ **Hero Wallet payouts + attestations**
+* M4 ▱▱▱▱▱ **Gov dashboard + ombuds API**
 
-### Bandwidth Efficiency Enhancements
+> Check **[Projects](./../../projects)** for sprint boards and velocity.
 
-#### **Edge Computing Integration**
-- **Research Finding**: Edge computing cuts down latency by processing data closer to users, reducing latency to 5-15 seconds, sometimes under 1 second
-- **Implementation**: Deploy HeroLens nodes at edge locations with content caching
-- **Bandwidth Savings**: Reduce backbone network traffic and response latency
+---
 
-#### **Adaptive Bitrate & Compression**
-```javascript
-// Advanced compression pipeline
-class CompressionPipeline {
-  constructor() {
-    this.codecs = {
-      video: ['H.265/HEVC', 'AV1', 'VP9'],
-      audio: ['Opus', 'AAC-LC'],
-      adaptive: true
-    };
-  }
-  
-  selectOptimalCodec(networkConditions) {
-    // Use research-backed codec selection
-    if (networkConditions.bandwidth < 1000) return 'H.265';
-    if (networkConditions.cpu > 0.8) return 'H.264';
-    return 'AV1'; // Best efficiency for adequate resources
-  }
-}
-```
+## 🤝 Governance & Ethics
 
-### Protocol Obsolescence Protection
+> \[!CAUTION]
+> **Non-negotiables.** No weaponization, stalking, or targeted harassment. Default delays in volatile contexts. Opt-out honored when safety allows.
 
-#### **Multi-Protocol Abstraction Layer**
-```javascript
-// Protocol-agnostic interface
-class StreamingAbstraction {
-  constructor() {
-    this.supportedProtocols = new Map([
-      ['RTMP', new RTMPHandler()],
-      ['RoQ', new QuicRTPHandler()],
-      ['MoQ', new MediaOverQuicHandler()],
-      ['SRT', new SRTHandler()],
-      ['NDN', new NDNHandler()], // Future ICN support
-      ['WebRTC', new WebRTCHandler()],
-      ['WHIP/WHEP', new WHIPHandler()] // Latest WebRTC standards
-    ]);
-  }
-  
-  addFutureProtocol(name, handler) {
-    // Hot-swappable protocol support
-    this.supportedProtocols.set(name, handler);
-  }
-}
-```
+* **Licensing.** Code AGPL-3.0; docs/media **CC BY-NC-SA 4.0** + Zero-Harm Addendum.
+* **Ombuds Circle.** Rotating 3-member quorum for disputes and takedowns.
+* **Transparency.** All moderator actions produce a signed `decision.json` with reason codes.
 
-### Security & Integrity Measures
+<details>
+<summary><b>🧠 Zero-Harm Addendum (short form)</b></summary>
 
-#### **Lightweight Streaming Security**
-- **Research Foundation**: Lightweight secure streaming protocol using simple and energy efficient cryptographic methods, such as Hash Message Authentication Codes (HMAC) and symmetrical ciphers
-- **Implementation**: Modified UDP packets embedding authentication data
+* Mandatory redaction defaults; no raw public dumps.
+* Fuzzy geo + time windows on evidence cards.
+* Clear anti-surveillance clause; bans model training on raw PII.
+* Improvements must be shared back; forks inherit the addendum.
 
-```javascript
-// Secure streaming implementation
-class SecureStreaming {
-  constructor(sharedKey) {
-    this.hmacKey = sharedKey;
-    this.cipher = 'AES-256-GCM';
-  }
-  
-  encryptStream(data) {
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipher(this.cipher, this.hmacKey);
-    const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
-    const hmac = crypto.createHmac('sha256', this.hmacKey).update(encrypted).digest();
-    
-    return { encrypted, hmac, iv };
-  }
-}
-```
+</details>
 
-## 4. Implementation Recommendations for ChatGPT
+---
 
-### Priority Development Areas
+## 🧰 Contributing
 
-#### **Phase 1: Core Infrastructure**
-1. **Cryptographic Key Management**
-   - Implement seed phrase derivation
-   - Create secure key storage
-   - Build recovery mechanisms
+* Open a draft PR with:
 
-2. **Local Database with Immutable Ledger**
-   - Design lightweight blockchain structure
-   - Implement data integrity verification
-   - Create automated backup/restore
+  * ✅ threat model update
+  * ✅ redaction test case
+  * ✅ anchor verification output (CID/ArTxID/OTS)
 
-3. **Resource Management**
-   - Build memory optimization system
-   - Implement compression algorithms
-   - Create dependency minimization tools
+Use <kbd>npm run dev</kbd> (web) and <kbd>python -m src.herolens</kbd> (core).
+See **`docs/safety/zero_harm.md`** before touching recording paths.
 
-#### **Phase 2: Streaming Integration**
-1. **Multi-Protocol Support Framework**
-   - Abstract streaming interface
-   - Protocol auto-detection
-   - Graceful degradation logic
+---
 
-2. **Network Condition Monitoring**
-   - Real-time latency measurement
-   - Bandwidth detection
-   - Connection stability assessment
+## 📣 One-liner / Blurbs
 
-### Code Structure Suggestions
+* **Tagline:** *Footage that can’t vanish.*
+* **Short:** Twitch-grade civic streams, immutably anchored, consent-first, hero-funded.
+* **Elevator:** Public service, on the record. Redacted by default, anchored forever, audited by design.
 
-```typescript
-// Suggested TypeScript interfaces
-interface HeroLensConfig {
-  seedPhrase: string;
-  preferredProtocols: StreamingProtocol[];
-  maxMemoryUsage: number;
-  compressionLevel: number;
-  offlineMode: boolean;
-}
+---
 
-interface StreamingProtocol {
-  name: string;
-  priority: number;
-  requirements: NetworkRequirements;
-  implementation: ProtocolHandler;
-}
+## 🏷️ Credits
 
-interface NetworkRequirements {
-  minBandwidth: number;
-  maxLatency: number;
-  stability: number;
-  securityLevel: 'low' | 'medium' | 'high';
-}
-```
+Foster + Navi, early ombuds volunteers, and the brave first responders & community heroes who choose radical transparency with compassion.
 
-## 5. Performance Benchmarks & Targets
+---
 
-### Latency Targets (Based on Research)
-- **RoQ**: 122-168ms (optimal conditions)
-- **RTMP**: 2000-5000ms (universal compatibility)
-- **SRT**: 500-1500ms (professional grade)
-- **MoQ**: 432-560ms (early adoption phase)
+### Bonus UI flourishes you can add later
 
-### Resource Constraints
-- **Memory**: <50MB total footprint
-- **CPU**: <20% single core utilization
-- **Storage**: <100MB for complete system
-- **Network**: Adaptive 56kbps to 50Mbps
-
-## 6. Testing & Validation Framework
-
-### Protocol Performance Testing
-```javascript
-// Automated protocol benchmarking
-class ProtocolBenchmark {
-  async testAllProtocols(testConditions) {
-    const results = new Map();
-    
-    for (const [name, protocol] of this.protocols) {
-      const metrics = await this.measureProtocol(protocol, testConditions);
-      results.set(name, {
-        latency: metrics.averageLatency,
-        throughput: metrics.throughput,
-        reliability: metrics.packetLoss,
-        resourceUsage: metrics.cpuGpu
-      });
-    }
-    
-    return this.rankProtocols(results);
-  }
-}
-```
-
-## Conclusion
-
-This HeroLens architecture leverages cutting-edge research in streaming protocols while maintaining backward compatibility and offline-first design principles. The system positions itself for future protocol adoption while ensuring robust performance across diverse network conditions.
-
-**Key Innovations:**
-- Multi-tier protocol selection with automatic fallback
-- Seed phrase-based cryptographic foundation
-- Immutable ledger integration for data integrity
-- Research-backed optimization techniques
-- Future-proof protocol abstraction layer
-
-The design balances current compatibility with emerging technologies, ensuring HeroLens remains competitive as streaming protocols evolve toward QUIC-based standards and edge computing integration.
+* **Auto-generated hero badges** (SVG) per event.
+* **Dark-mode banner** (SVG) with scanline animation in the README header.
+* **Mini “evidence cards”** rendered via GitHub Pages from `datasets/evidence/*.json`.
